@@ -1,0 +1,8 @@
+[app]
+RunMode = "error"
+[database]
+UserName = "root"
+Password = "root"
+Host = "127.0.0.1"
+Port = "3306"
+DbName = "loanmarket"
