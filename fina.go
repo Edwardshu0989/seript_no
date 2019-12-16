@@ -79,7 +79,7 @@ func init() {
 
 func main() {
 	d := cron.New()
-	d.AddFunc("@hourly", task)
+	d.AddFunc("0 0 */2 * *", task)
 	d.Start()
 	t1 := time.NewTimer(time.Minute * 1)
 	for {
