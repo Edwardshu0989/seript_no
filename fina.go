@@ -5,11 +5,15 @@ import (
 	"net/http"
 	"strings"
 
+	"context"
+	"log"
 	"net/smtp"
 	"task/lib/logger"
 	"time"
 
+	"github.com/chromedp/chromedp"
 	"github.com/gocolly/colly"
+
 	// "github.com/jinzhu/gorm"
 	"github.com/robfig/cron"
 	"github.com/yeeyuntech/yeego"
@@ -79,7 +83,7 @@ func init() {
 
 func main() {
 	d := cron.New()
-	d.AddFunc("0 0 */2 * *", task)
+	d.AddFunc("0 0 0/1 * * *", task)
 	d.Start()
 	t1 := time.NewTimer(time.Minute * 1)
 	for {
@@ -124,17 +128,14 @@ func download(url string, commodity string) {
 	nowTime := time.Now().Format("2006-01-02T 15:04:05")
 	start := strings.LastIndex(url, ".")
 	content := url[start+1 : len(url)]
-	c.OnHTML("title", func(e *colly.HTMLElement) {
-		title = e.Text
-	})
-	err = c.Visit(url)
+	productName, err := BrowserAccess(url)
 	if err != nil {
 		easyweb.Logger.Error("链接%s谷歌链接访问出错:%s", url, err.Error())
 		vestInfos := content + url + offline + nowTime
 		SendMail(vestInfos)
 	} else {
 		if !strings.Contains(title, commodity) {
-			vestInfos := content + url + offline + nowTime
+			vestInfos := content + url + offline + nowTime + productName
 			SendMail(vestInfos)
 		} else {
 			// vestinfo := VestBag{
@@ -143,7 +144,7 @@ func download(url string, commodity string) {
 			// 	CreateAt:   nowTime,
 			// 	State:      online,
 			// }
-			vestInfos := content + url + offline + nowTime
+			vestInfos := content + url + offline + nowTime + productName
 			SendMail(vestInfos)
 			easyweb.Logger.Error("%s%s%s:", content, nowTime, "成功")
 			// if err := defaultDb.Create(&vestinfo).Error; err != nil {
@@ -165,6 +166,41 @@ func download(url string, commodity string) {
 			// }
 		}
 	}
+}
+
+func BrowserAccess(url string) (string, error) {
+	var buf []byte
+
+	// create chrome instance
+	ctx, cancel := chromedp.NewContext(
+		context.Background(),
+		chromedp.WithLogf(log.Printf),
+	)
+	defer cancel()
+
+	// create a timeout
+	ctx, cancel = context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	// navigate to a page, wait for an element, click
+	var example string
+	err := chromedp.Run(ctx,
+		//访问打开必应页面
+		// chromedp.Navigate(`https://cn.bing.com/?mkt=zh-CN`),
+		chromedp.Navigate(url),
+		// 等待加载完成
+		chromedp.WaitVisible(`#ZCHFDb`),
+		chromedp.Text(`#fcxH9b > div.WpDbMd > c-wiz > div > div.ZfcPIb > div > div.JNury.Ekdcne > div > c-wiz:nth-child(1) > c-wiz:nth-child(1) > div > div.D0ZKYe > div > div.sIskre > c-wiz:nth-child(1) > h1 > span`, &example),
+		chromedp.CaptureScreenshot(&buf),
+	)
+	return example, err
+	// if err != nil {
+	// 	easyweb.Logger.Error("%s  %s error: %s", url, "访问出错", err.Error())
+	// }
+	// if example != "" {
+	// 	easyweb.Logger.Error("%s  %s ", example, "访问成功")
+	// }
+
 }
 
 func download2(url string) (string, error) {
